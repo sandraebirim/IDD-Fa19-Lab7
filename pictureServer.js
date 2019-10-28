@@ -28,7 +28,7 @@ var SerialPort = require('serialport'); // serial library
 var Readline = SerialPort.parsers.Readline; // read serial data as lines
 //-- Addition:
 var NodeWebcam = require( "node-webcam" );// load the webcam module
-
+var Jimp = require('jimp');
 //---------------------- WEBAPP SERVER SETUP ---------------------------------//
 // use express to create the simple webapp
 app.use(express.static('public')); // find pages in public directory
@@ -85,10 +85,35 @@ const parser = new Readline({
 
 // Read data that is available on the serial port and send it to the websocket
 serial.pipe(parser);
+
 parser.on('data', function(data) {
   console.log('Data:', data);
   io.emit('server-msg', data);
+  if (data =='light'){ 
+    var imageName = new Date().toString().replace(/[&\/\\#,+()$~%.'":*?<>{}\s-]/g, '');
+
+    console.log('making a making a picture at'+ imageName); // Second, the name is logged to the console.
+
+    //Third, the picture is  taken and saved to the `public/`` folder
+    NodeWebcam.capture('public/'+imageName+'.jpg', opts, function( err, data ) {
+   // io.emit('newPicture',(imageName+'.jpg')); ///Lastly, the new name is send to the client web browser.
+  
+    Jimp.read('public/'+imageName +'.jpg', (err, image) =>{
+       if (err) throw err;
+       image
+         .resize(256, 256)
+         .quality(60)
+         .invert()
+         .posterize(60)
+         .write('public/NewPicture' + imageName + '.jpg'); 
+     });     
+     
+     });
+    io.emit('newPic', ('NewPicture' + imageName + '.jpg'));
+};
 });
+
+  
 //----------------------------------------------------------------------------//
 
 
@@ -110,7 +135,10 @@ io.on('connect', function(socket) {
     serial.write('L');
   });
 
-  //-- Addition: This function is called when the client clicks on the `Take a picture` button.
+  //-- Addition: This function is called when the client clicks on the `Take a picture` button.	
+
+//var light = parser.on('data', function(data){console.log('help:', data); });
+	
   socket.on('takePicture', function() {
     /// First, we create a name for the new picture.
     /// The .replace() function removes all special characters from the date.
@@ -126,6 +154,7 @@ io.on('connect', function(socket) {
   });
 
   });
+
   // if you get the 'disconnect' message, say the user disconnected
   socket.on('disconnect', function() {
     console.log('user disconnected');
